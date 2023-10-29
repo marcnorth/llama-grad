@@ -1,0 +1,4 @@
+setuptools~=65.5.1
+torch~=2.1.0
+transformers~=4.34.0
+html2image~=2.0.4.3
