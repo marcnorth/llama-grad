@@ -1,8 +1,10 @@
 import torch
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from torch import Tensor
+from transformers import PreTrainedModel, PreTrainedTokenizerBase, LlamaForCausalLM
+from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 from gradient_calculator.gradient_calculator import GradientCalculator
 from token_with_gradients import TokenWithGradients
-from typing import List
+from typing import List, Callable, Type
 from visualization.html_visualizer import HtmlVisualizer
 
 
@@ -14,6 +16,11 @@ class LlamaGrad:
     Calling next_token multiple times will append the preceding output to the input for generating the next token.
     i.e. if i is the initial input, calling next_token once will use i to generate the first output token, o0. Calling next_token again will use concat(i, o0) as input to generate the second output, o1.
     """
+
+    embedding_functions: dict[PreTrainedModel, Callable[[PreTrainedModel, Tensor], Tensor]] = {
+        GPT2LMHeadModel: lambda model, token_ids: model.transformer.wte(token_ids),
+        LlamaForCausalLM: lambda model, token_ids: model.model.embed_tokens(token_ids)
+    }
 
     def __init__(
             self,
@@ -65,8 +72,7 @@ class LlamaGrad:
         # Append outputs to inputs to create full input
         input_ids = torch.cat((self.input_encodings["input_ids"][0], self.output_tokens_with_gradients.token_ids), dim=0) if self.output_tokens_with_gradients.token_ids is not None else self.input_encodings["input_ids"][0]
 
-        # TODO: Needs to be per-model
-        input_embeddings = self.model.transformer.wte(input_ids.unsqueeze(0))
+        input_embeddings = self.embed_token_ids(input_ids.unsqueeze(0))
         #input_embeddings.requires_grad = True
 
         # Pass to gradient calculation strategy (e.g. SmoothGrad)
@@ -76,9 +82,29 @@ class LlamaGrad:
 
         return token_with_gradients
 
+    def embed_token_ids(self, token_ids: Tensor) -> Tensor:
+        if type(self.model) not in self.embedding_functions:
+            raise ModelEmbeddingNotSupported(f"Embedding model {type(self.model)} is not supported. To add an embedding function, call LlamaGrad.register_embedding_function()")
+        return self.embedding_functions[type(self.model)](self.model, token_ids)
+
     def html_visualizer(self):
         return HtmlVisualizer(
             self.tokenizer,
             self.prompt,
             self.output_tokens_with_gradients
         )
+
+    @staticmethod
+    def register_embedding_function(model_class: Type[PreTrainedModel], embedding_function: Callable[[PreTrainedModel, Tensor], Tensor]):
+        """
+        Registers an embedding function. Since embedding in PreTrainedModels is not consistent, we need
+        to know how to embed token_ids for the used model. E.g.
+        LlamaGrad.register_embedding_function(GPT2LMHeadModel), lambda model, token_ids: model.transformer.wte(token_ids))
+        :param model_class:
+        :param embedding_function:
+        :return:
+        """
+        LlamaGrad.embedding_functions[model_class] = embedding_function
+
+class ModelEmbeddingNotSupported(Exception):
+    pass
