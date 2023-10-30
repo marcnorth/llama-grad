@@ -1,4 +1,4 @@
-from .core import LlamaGrad
+from .llama_grad import LlamaGrad
 from .token_with_gradients import TokenWithGradients
 from .gradient_calculator.gradient_calculator import GradientCalculator
 from .gradient_calculator.simple_gradient_calculator import SimpleGradientCalculator

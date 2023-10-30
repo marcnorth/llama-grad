@@ -1,6 +1,6 @@
 from unittest import TestCase
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
-from core import LlamaGrad
+from llama_grad import LlamaGrad
 from token_with_gradients import TokenWithGradients
 from gradient_calculator.simple_gradient_calculator import SimpleGradientCalculator
 
