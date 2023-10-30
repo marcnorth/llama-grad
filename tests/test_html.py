@@ -26,7 +26,6 @@ class TestHtml(TestCase):
         )
         html = html_visualizer.nth_output_to_html(0)
         matches = re.findall("<span\s+data-token-ids=\"([\[\]0-9,]+)\"\s+style=\"background-color:rgba\([0-9\.]+,[0-9\.]+,[0-9\.]+,([0-9\.]+)\)\"[^>]*>([^<]*)</span>", html)
-        print(matches)
         self.assertEqual(2, len(matches))  # One for each input token
         self.assertEqual("Hello", matches[0][2])
         self.assertEqual(" world", matches[1][2])
