@@ -38,7 +38,7 @@ class LlamaGrad:
         self.model = model
         self.prompt = prompt
         self.tokenizer = tokenizer
-        self.input_encodings = tokenizer.batch_encode_plus([prompt], return_tensors="pt", add_special_tokens=False, padding=True)
+        self.input_encodings = tokenizer.batch_encode_plus([prompt], return_tensors="pt", add_special_tokens=False, padding=False)
         self.output_tokens_with_gradients = TokenWithGradients()
         self.gradient_calculator = gradient_calculator
 
