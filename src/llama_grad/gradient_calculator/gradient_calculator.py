@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from torch import Tensor
 from transformers import PreTrainedModel
-from token_with_gradients import TokenWithGradients
+from llama_grad.token_with_gradients import TokenWithGradients
 
 
 class GradientCalculator(ABC):

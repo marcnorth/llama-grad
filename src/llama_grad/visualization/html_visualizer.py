@@ -6,7 +6,7 @@ from typing import List, Union, Tuple, Optional
 import torch
 from html2image import Html2Image
 from transformers import PreTrainedTokenizerBase
-from token_with_gradients import TokenWithGradients
+from llama_grad.token_with_gradients import TokenWithGradients
 
 
 class MaxGradient(Enum):

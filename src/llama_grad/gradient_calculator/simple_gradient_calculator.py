@@ -1,8 +1,8 @@
 import torch
 from torch import Tensor
 from transformers import PreTrainedModel
-from gradient_calculator.gradient_calculator import GradientCalculator
-from token_with_gradients import TokenWithGradients
+from llama_grad.gradient_calculator.gradient_calculator import GradientCalculator
+from llama_grad.token_with_gradients import TokenWithGradients
 
 
 class SimpleGradientCalculator(GradientCalculator):

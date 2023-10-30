@@ -10,6 +10,6 @@ setup(
         "html2image>=2.0.4.3",
         "typing-extensions>=4.8.0"
     ],
-    packages=["llama_grad", "llama_grad.gradient_calculator", "llama_grad.visualization"],
-    package_dir={"llama_grad": "src"}
+    packages=find_packages("src"),
+    package_dir={"": "src"}
 )

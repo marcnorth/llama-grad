@@ -2,9 +2,8 @@ from unittest import TestCase
 import re
 from torch import Tensor
 from transformers import GPT2Tokenizer
-from token_with_gradients import TokenWithGradients
-from visualization.html_visualizer import HtmlVisualizer, MaxGradient, GroupGradientPooling
-
+from llama_grad import TokenWithGradients
+from llama_grad.visualization import HtmlVisualizer, MaxGradient, GroupGradientPooling
 
 class TestHtml(TestCase):
     def test_create_html(self):
