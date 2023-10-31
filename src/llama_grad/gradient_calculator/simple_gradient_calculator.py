@@ -15,8 +15,9 @@ class SimpleGradientCalculator(GradientCalculator):
             input_embeddings.grad.zero_()
 
         # output is batch, but batch size is always one
-        current_logits = output.logits[0].sum()
-        current_logits.backward(retain_graph=True)
+        model.zero_grad()
+        max_logits = output.logits[0].max()
+        max_logits.backward(retain_graph=True)
 
         # Magnitude of gradient for w.r.t each input token
         gradients = torch.norm(input_embeddings.grad[0].clone(), dim=-1).unsqueeze(0)

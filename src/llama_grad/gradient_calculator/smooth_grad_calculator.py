@@ -43,6 +43,7 @@ class SmoothGradCalculator(GradientCalculator):
         output = model.forward(inputs_embeds=input_embeddings_with_noise)
 
         # output is batch, but batch size is always one
+        model.zero_grad()
         current_logits = output.logits[0].sum()
         current_logits.backward(retain_graph=True)
 
