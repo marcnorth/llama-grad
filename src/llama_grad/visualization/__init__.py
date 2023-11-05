@@ -1,1 +1,1 @@
-from .html_visualizer import HtmlVisualizer, MaxGradient, GroupGradientPooling
+from .html_visualizer import HtmlVisualizer

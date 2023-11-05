@@ -1,22 +1,12 @@
 import html
 import os
 from enum import Enum
-from statistics import mean
 from typing import List, Union, Tuple, Optional
 import torch
 from html2image import Html2Image
 from transformers import PreTrainedTokenizerBase
+from llama_grad.input_importance_calculator import GroupGradientPooling, MaxGradient
 from llama_grad.token_with_gradients import TokenWithGradients
-
-
-class MaxGradient(Enum):
-    ALL_OUTPUTS = 1  # Uses max gradient across all outputs
-    SINGLE_OUTPUT = 2  # Uses max gradient of only the output html is being generated for
-
-
-class GroupGradientPooling(Enum):
-    AVERAGE = 1
-    MAX = 2
 
 
 class HtmlVisualizer:
@@ -46,10 +36,13 @@ class HtmlVisualizer:
         """
         # We only want gradient values up to this output token's position
         grouped_input_token_ids, grouped_input_gradients = self._group_input_token_ids(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling)
+        print(grouped_input_token_ids)
+        print(grouped_input_gradients)
         grouped_input_tokens = [self.tokenizer.decode(token) for token in grouped_input_token_ids]
         output_token_id = self.token_with_gradients.token_ids[output_token_index].item()
         output_token = self.tokenizer.decode(output_token_id)
         # remaining_input_text = input_text
+        # TODO: This should be part of InputImportanceCalculator as well
         max_input_gradient = (
             max(grouped_input_gradients) if max_gradient == MaxGradient.SINGLE_OUTPUT else
             torch.max(self.token_with_gradients.gradients) if max_gradient == MaxGradient.ALL_OUTPUTS else
@@ -58,6 +51,7 @@ class HtmlVisualizer:
         html_body = ""
         for input_token_ids, input_tokens, input_gradient in zip(grouped_input_token_ids, grouped_input_tokens,
                                                                  grouped_input_gradients):
+            # opacity is basically the 'importance score'
             opacity = input_gradient / max_input_gradient
             if not isinstance(input_token_ids, list):
                 input_token_ids = [input_token_ids]
@@ -70,43 +64,10 @@ class HtmlVisualizer:
         html_inc_head = f"<html><head><style>{css}</style></head><body>{html_body}</body></html>"
         return html_inc_head
 
+    # TODO: This should be in its own class (InputImportanceCalculator or similar)
     def _group_input_token_ids(self, output_token_index: int, groups: List[str] = None,
                                group_gradient_pooling=Optional[GroupGradientPooling]) -> Tuple[List[List[int]], List[List[float]]]:
-        """
-        Groups the input token ids based on the given groups. Any tokens not in a group are returned individually
-        :param output_token_index:
-        :param groups:
-        :return:
-        """
-        input_ids = self.input_token_ids + self.token_with_gradients.token_ids[:output_token_index].tolist()
-        input_gradients = self.token_with_gradients.gradients[output_token_index][
-                          :self.input_token_count + output_token_index]
-        grouped_input_ids = []
-        grouped_input_gradients = []
-        continue_searching_from = 0  # Index to continue searching for group from
-        for group in groups:
-            # Look for group in input_ids
-            group_token_ids = self.tokenizer.encode_plus(group)["input_ids"]
-            found_index = None
-            for i in range(continue_searching_from, len(input_ids) - len(group_token_ids) + 1):
-                if input_ids[i:i + len(group_token_ids)] == group_token_ids:
-                    found_index = i
-                    break
-            if found_index is None:
-                raise ValueError(f"Group '{group}' not found")
-            # Add all individual tokens before group, then add group
-            if found_index > continue_searching_from:
-                grouped_input_ids.extend(input_ids[continue_searching_from:found_index])
-                grouped_input_gradients.extend(input_gradients[continue_searching_from:found_index].tolist())
-            grouped_input_ids.append(group_token_ids)
-            # Calculate group gradient using pooling strategy
-            group_gradient = mean(input_gradients[found_index:found_index + len(group_token_ids)].tolist()) if group_gradient_pooling == GroupGradientPooling.AVERAGE else max(input_gradients[found_index:found_index + len(group_token_ids)].tolist())
-            grouped_input_gradients.append(group_gradient)
-            continue_searching_from = found_index + len(group_token_ids)
-        # Add any tokens not already added
-        grouped_input_ids.extend(input_ids[continue_searching_from:])
-        grouped_input_gradients.extend(input_gradients[continue_searching_from:].tolist())
-        return grouped_input_ids, grouped_input_gradients
+        pass
 
     def nth_output_to_image(
             self,

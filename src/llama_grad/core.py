@@ -3,9 +3,9 @@ from torch import Tensor
 from transformers import PreTrainedModel, PreTrainedTokenizerBase, LlamaForCausalLM
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 from typing import List, Callable, Type
-from .visualization.html_visualizer import HtmlVisualizer
-from .gradient_calculator.gradient_calculator import GradientCalculator
 from .token_with_gradients import TokenWithGradients
+from .gradient_calculator.gradient_calculator import GradientCalculator
+from .visualization.html_visualizer import HtmlVisualizer
 
 
 class LlamaGrad:

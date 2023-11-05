@@ -1,5 +1,5 @@
-from .core import LlamaGrad
 from .token_with_gradients import TokenWithGradients
+from .core import LlamaGrad
 from .gradient_calculator.gradient_calculator import GradientCalculator
 from .gradient_calculator.simple_gradient_calculator import SimpleGradientCalculator
 from .gradient_calculator.smooth_grad_calculator import SmoothGradCalculator
