@@ -3,6 +3,8 @@ from torch import Tensor
 from transformers import PreTrainedModel, PreTrainedTokenizerBase, LlamaForCausalLM
 from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
 from typing import List, Callable, Type
+
+from .input_importance_calculator import InputImportanceCalculator
 from .token_with_gradients import TokenWithGradients
 from .gradient_calculator.gradient_calculator import GradientCalculator
 from .visualization.html_visualizer import HtmlVisualizer
@@ -88,7 +90,10 @@ class LlamaGrad:
         return self.embedding_functions[type(self.model)](self.model, token_ids)
 
     def html_visualizer(self):
-        return HtmlVisualizer(
+        return HtmlVisualizer(self.input_importance_calculator())
+
+    def input_importance_calculator(self):
+        return InputImportanceCalculator(
             self.tokenizer,
             self.prompt,
             self.output_tokens_with_gradients

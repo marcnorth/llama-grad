@@ -1,22 +1,13 @@
 import html
 import os
-from enum import Enum
-from typing import List, Union, Tuple, Optional
-import torch
+from typing import List, Union, Optional
 from html2image import Html2Image
-from transformers import PreTrainedTokenizerBase
-from llama_grad.input_importance_calculator import GroupGradientPooling, MaxGradient
-from llama_grad.token_with_gradients import TokenWithGradients
+from llama_grad.input_importance_calculator import GroupGradientPooling, MaxGradient, InputImportanceCalculator
 
 
 class HtmlVisualizer:
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, prompt: str, token_with_gradients: TokenWithGradients):
-        self.tokenizer = tokenizer
-        self.prompt = prompt
-        self.input_token_ids: List[int] = tokenizer.batch_encode_plus([prompt], add_special_tokens=False)["input_ids"][
-            0]
-        self.input_token_count = len(self.input_token_ids)
-        self.token_with_gradients = token_with_gradients
+    def __init__(self, importance_calculator: InputImportanceCalculator):
+        self.importance_calculator = importance_calculator
 
     def nth_output_to_html(
             self,
@@ -34,28 +25,15 @@ class HtmlVisualizer:
         :param group_gradient_pooling: How to pool the gradients of groups
         :return: html
         """
-        # We only want gradient values up to this output token's position
-        grouped_input_token_ids, grouped_input_gradients = self._group_input_token_ids(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling)
-        print(grouped_input_token_ids)
-        print(grouped_input_gradients)
-        grouped_input_tokens = [self.tokenizer.decode(token) for token in grouped_input_token_ids]
-        output_token_id = self.token_with_gradients.token_ids[output_token_index].item()
-        output_token = self.tokenizer.decode(output_token_id)
-        # remaining_input_text = input_text
-        # TODO: This should be part of InputImportanceCalculator as well
-        max_input_gradient = (
-            max(grouped_input_gradients) if max_gradient == MaxGradient.SINGLE_OUTPUT else
-            torch.max(self.token_with_gradients.gradients) if max_gradient == MaxGradient.ALL_OUTPUTS else
-            max_gradient)
+        grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_nth_output(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling, max_gradient=max_gradient)
+        grouped_input_tokens = [self.importance_calculator.tokenizer.decode(token) for token in grouped_input_token_ids]
         # Create html
         html_body = ""
-        for input_token_ids, input_tokens, input_gradient in zip(grouped_input_token_ids, grouped_input_tokens,
-                                                                 grouped_input_gradients):
-            # opacity is basically the 'importance score'
-            opacity = input_gradient / max_input_gradient
+        for input_token_ids, input_tokens, input_importance in zip(grouped_input_token_ids, grouped_input_tokens,
+                                                                 grouped_input_importance):
             if not isinstance(input_token_ids, list):
                 input_token_ids = [input_token_ids]
-            html_body += f"<span data-token-ids=\"[{','.join([str(tid) for tid in input_token_ids])}]\" style=\"background-color:rgba(255,0,0,{opacity:.3f})\">{html.escape(input_tokens)}</span>"
+            html_body += f"<span data-token-ids=\"[{','.join([str(tid) for tid in input_token_ids])}]\" style=\"background-color:rgba(255,0,0,{input_importance:.3f})\">{html.escape(input_tokens)}</span>"
         css = """
                 body {background-color:#fff}
                 span[data-token-ids] {font-size: 20px;}
@@ -63,11 +41,6 @@ class HtmlVisualizer:
         html_body = "<br/>".join(html_body.split("\n"))
         html_inc_head = f"<html><head><style>{css}</style></head><body>{html_body}</body></html>"
         return html_inc_head
-
-    # TODO: This should be in its own class (InputImportanceCalculator or similar)
-    def _group_input_token_ids(self, output_token_index: int, groups: List[str] = None,
-                               group_gradient_pooling=Optional[GroupGradientPooling]) -> Tuple[List[List[int]], List[List[float]]]:
-        pass
 
     def nth_output_to_image(
             self,
@@ -109,7 +82,7 @@ class HtmlVisualizer:
         :return: html
         :return:
         """
-        for i in range(self.token_with_gradients.token_ids.shape[0]):
+        for i in range(self.importance_calculator.token_with_gradients.token_ids.shape[0]):
             self.nth_output_to_image(
                 i,
                 output_path=os.path.join(output_dir, f"{i}.{file_extension}"),

@@ -3,7 +3,8 @@ import re
 from torch import Tensor
 from transformers import GPT2Tokenizer
 from llama_grad import TokenWithGradients
-from llama_grad.visualization import HtmlVisualizer, MaxGradient, GroupGradientPooling
+from llama_grad.input_importance_calculator import MaxGradient, GroupGradientPooling, InputImportanceCalculator
+from llama_grad.visualization import HtmlVisualizer
 
 class TestHtml(TestCase):
     def test_create_html(self):
@@ -18,11 +19,11 @@ class TestHtml(TestCase):
             [1., 4., 0.],
             [3.3333333, 5., 10.]
         ])
-        html_visualizer = HtmlVisualizer(
+        html_visualizer = HtmlVisualizer(InputImportanceCalculator(
             tokenizer,
             prompt="Hello world",
             token_with_gradients=token_with_gradients
-        )
+        ))
         html = html_visualizer.nth_output_to_html(0)
         matches = re.findall("<span\s+data-token-ids=\"([\[\]0-9,]+)\"\s+style=\"background-color:rgba\([0-9\.]+,[0-9\.]+,[0-9\.]+,([0-9\.]+)\)\"[^>]*>([^<]*)</span>", html)
         self.assertEqual(2, len(matches))  # One for each input token
@@ -52,11 +53,11 @@ class TestHtml(TestCase):
             [1., 4., 0.],
             [3.3333333, 5., 10.]
         ])
-        html_visualizer = HtmlVisualizer(
+        html_visualizer = HtmlVisualizer(InputImportanceCalculator(
             tokenizer,
             prompt="Hello world",
             token_with_gradients=token_with_gradients
-        )
+        ))
         # SINGLE_OUTPUT will use max for that output only (i.e. 4 = max([1., 4., 0.])
         html = html_visualizer.nth_output_to_html(
             0,
@@ -93,11 +94,11 @@ class TestHtml(TestCase):
         token_with_gradients = TokenWithGradients()
         token_with_gradients.token_ids = output_ids
         token_with_gradients.gradients = Tensor([[1., 2., 3., 4., 5., 6., 7., 8.]])
-        html_visualizer = HtmlVisualizer(
+        html_visualizer = HtmlVisualizer(InputImportanceCalculator(
             tokenizer,
             prompt=" Group one Group two Not part Group one",
             token_with_gradients=token_with_gradients
-        )
+        ))
         html = html_visualizer.nth_output_to_html(
             0,
             groups=[" Group one", " Group two", " Group one"]
@@ -118,11 +119,11 @@ class TestHtml(TestCase):
         token_with_gradients = TokenWithGradients()
         token_with_gradients.token_ids = output_ids
         token_with_gradients.gradients = Tensor([[1., 2., 3., 4., 5., 6., 7., 8.]])
-        html_visualizer = HtmlVisualizer(
+        html_visualizer = HtmlVisualizer(InputImportanceCalculator(
             tokenizer,
             prompt=" Group one Group two Not part Group one",
             token_with_gradients=token_with_gradients
-        )
+        ))
         # Average pooling, max gradient is 7.5 (average of 7 and 8)
         html = html_visualizer.nth_output_to_html(
             0,
@@ -160,11 +161,11 @@ class TestHtml(TestCase):
         token_with_gradients = TokenWithGradients()
         token_with_gradients.token_ids = output_ids
         token_with_gradients.gradients = Tensor([[1., 2., 3., 4.]])
-        html_visualizer = HtmlVisualizer(
+        html_visualizer = HtmlVisualizer(InputImportanceCalculator(
             tokenizer,
             prompt="Hello>\nworld",
             token_with_gradients=token_with_gradients
-        )
+        ))
         html = html_visualizer.nth_output_to_html(0)
         matches = re.findall("<span\s+data-token-ids=\"([\[\]0-9,]+)\"\s+style=\"background-color:rgba\([0-9\.]+,[0-9\.]+,[0-9\.]+,([0-9\.]+)\)\"[^>]*>(.*?)</span>", html)
         self.assertEqual(4, len(matches))
