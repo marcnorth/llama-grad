@@ -14,7 +14,9 @@ class HtmlVisualizer:
             output_token_index: int,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None
+            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            prompt_only: bool = False,
+            ignore: List[str] = []
     ) -> str:
         """
         Outputs the gradients of specified output token w.r.t. each input token
@@ -23,6 +25,8 @@ class HtmlVisualizer:
         :param max_gradient: The max value to use for calculating opacities. MaxGradient.SINGLE_OUTPUT (default) will use the maximum gradient for that output (i.e. that input will have opacity=1), MaxGradient.ALL_OUTPUTS will use the maximum across all output tokens
         :param groups: List of string to group gradients by. Gradients will be calculated according to group_gradient_pooling strategy
         :param group_gradient_pooling: How to pool the gradients of groups
+        :param prompt_only: Only use the prompt input tokens and gradients, not the previous appended output tokens
+        :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: html
         """
         grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_nth_output(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling, max_gradient=max_gradient)
@@ -48,7 +52,9 @@ class HtmlVisualizer:
             output_path: str,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None
+            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            prompt_only: bool = False,
+            ignore: List[str] = []
     ):
         """
         Outputs the gradients of specified output token w.r.t. each input token
@@ -58,6 +64,8 @@ class HtmlVisualizer:
         :param max_gradient: The max value to use for calculating opacities. MaxGradient.SINGLE_OUTPUT (default) will use the maximum gradient for that output (i.e. that input will have opacity=1), MaxGradient.ALL_OUTPUTS will use the maximum across all output tokens
         :param groups: List of string to group gradients by. Gradients will be calculated according to group_gradient_pooling strategy
         :param group_gradient_pooling: How to pool the gradients of groups
+        :param prompt_only: Only use the prompt input tokens and gradients, not the previous appended output tokens
+        :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: html
         """
         html_str = self.nth_output_to_html(output_token_index, max_gradient, groups, group_gradient_pooling)
@@ -70,7 +78,9 @@ class HtmlVisualizer:
             output_dir: str,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            group_gradient_pooling: Optional[GroupGradientPooling] = None,,
+            prompt_only: bool = False,
+            ignore: List[str] = [],
             file_extension: str = 'png'
     ):
         """
@@ -79,6 +89,8 @@ class HtmlVisualizer:
         :param max_gradient: The max value to use for calculating opacities. MaxGradient.SINGLE_OUTPUT (default) will use the maximum gradient for that output (i.e. that input will have opacity=1), MaxGradient.ALL_OUTPUTS will use the maximum across all output tokens
         :param groups: List of string to group gradients by. Gradients will be calculated according to group_gradient_pooling strategy
         :param group_gradient_pooling: How to pool the gradients of groups
+        :param prompt_only: Only use the prompt input tokens and gradients, not the previous appended output tokens
+        :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: html
         :return:
         """
