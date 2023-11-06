@@ -41,10 +41,7 @@ class LlamaGrad:
         self.prompt = prompt
         self.tokenizer = tokenizer
         self.input_encodings = tokenizer.batch_encode_plus([prompt], return_tensors="pt", add_special_tokens=False, padding=False).to(self.model.device)
-        print("init")
-        print(self.input_encodings["input_ids"].device)
-        print(self.model.device)
-        self.output_tokens_with_gradients = TokenWithGradients()
+        self.output_tokens_with_gradients = TokenWithGradients(self.model.device)
         self.gradient_calculator = gradient_calculator
 
     def generate(self, stop_tokens: List[str] = None, max_output_length: int = None) -> TokenWithGradients:

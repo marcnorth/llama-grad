@@ -4,9 +4,9 @@ import torch
 
 
 class TokenWithGradients:
-    def __init__(self):
+    def __init__(self, device: torch.device):
         # 1-D Tensor of predicted token_ids of size (output_sequence_length)
-        self.token_ids: Tensor = torch.zeros([0], dtype=torch.int)
+        self.token_ids: Tensor = torch.zeros([0], dtype=torch.int).to(device)
         # 2-D Tensor of gradients of size (output_sequence_length, input_size + self.token_ids.shape[0] - 1)
         self.gradients: Tensor = None
 
