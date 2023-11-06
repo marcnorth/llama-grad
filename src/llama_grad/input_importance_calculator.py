@@ -35,14 +35,21 @@ class InputImportanceCalculator:
             output_token_index: int,
             groups: List[str] = [],
             group_gradient_pooling=Optional[GroupGradientPooling],
-            max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT
+            max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
+            prompt_only: bool = False
     ) -> Tuple[List[float], List[int]]:
         """
         Calculates the importance of each input token for the nth output token
         :return: Tuple[List of importance scores, List of token ids (or groups)]
         """
-        input_ids = self.input_token_ids + self.token_with_gradients.token_ids[:output_token_index].tolist()
-        input_gradients = self.token_with_gradients.gradients[output_token_index][:self.input_token_count + output_token_index]
+        if prompt_only:
+            # Only use the prompt input tokens and gradients
+            input_ids = self.input_token_ids
+            input_gradients = self.token_with_gradients.gradients[output_token_index][:self.input_token_count]
+        else:
+            # Append the previous output tokens (0 to output_token_index-1) to the input
+            input_ids = self.input_token_ids + self.token_with_gradients.token_ids[:output_token_index].tolist()
+            input_gradients = self.token_with_gradients.gradients[output_token_index][:self.input_token_count + output_token_index]
         grouped_input_ids = []
         grouped_input_gradients = []
         continue_searching_from = 0  # Index to continue searching for group from

@@ -24,7 +24,6 @@ class TestInputImportanceCalculator(TestCase):
         self.assertAlmostEqual(2, len(importance_scores))  # One for each input token
         self.assertAlmostEqual(0.25, importance_scores[0])
         self.assertAlmostEqual(1., importance_scores[1])
-        # TODO: Calculation needs to take into account MAX value
         importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(1)
         self.assertAlmostEqual(3, len(importance_scores))  # One for each input token
         self.assertAlmostEqual(1./3., importance_scores[0])
@@ -129,20 +128,39 @@ class TestInputImportanceCalculator(TestCase):
         self.assertAlmostEqual(0.75, importance_scores[3])  # = 6 / 8 = 0.75
         self.assertAlmostEqual(1., importance_scores[4])  # = max(7,8) / 8 = 1
 
-    def test_line_breaks(self):
+    def test_prompt_only(self):
         """
-        Line breaks should be converted to <br/>
+        Calculates importance and max using ONLY the original prompt
         :return:
         """
         tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
-        output_ids = tokenizer.batch_encode_plus([" one"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
+        output_ids = tokenizer.batch_encode_plus(["test prompt"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
         token_with_gradients = TokenWithGradients()
         token_with_gradients.token_ids = output_ids
-        token_with_gradients.gradients = Tensor([[1., 2., 3., 4.]])
+        token_with_gradients.gradients = Tensor([
+            [1., 2., 3., 4., 5., 6., 0.],
+            [1., 2., 3., 4., 5., 6., 7.],
+        ])
         importance_calculator = InputImportanceCalculator(
             tokenizer,
-            prompt="Hello>\nworld",
+            prompt="one two three four five six",
             token_with_gradients=token_with_gradients
         )
-        importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(0)
-        self.assertAlmostEqual(4, len(importance_scores))
+        # Default of 2nd token includes the appended 1st output token
+        default_importance_scores_0, _ = importance_calculator.calculate_importance_for_nth_output(0)
+        default_importance_scores_1, _ = importance_calculator.calculate_importance_for_nth_output(1)
+        self.assertEqual(6, len(default_importance_scores_0))
+        self.assertEqual(7, len(default_importance_scores_1))
+        self.assertAlmostEqual(1./7., default_importance_scores_1[0])
+        # prompt_only of 2nd token does not include the appended 1st output token
+        prompt_only_importance_scores_0, _ = importance_calculator.calculate_importance_for_nth_output(
+            0,
+            prompt_only=True
+        )
+        prompt_only_importance_scores_1, _ = importance_calculator.calculate_importance_for_nth_output(
+            1,
+            prompt_only=True
+        )
+        self.assertEqual(6, len(prompt_only_importance_scores_0))
+        self.assertEqual(6, len(prompt_only_importance_scores_1))
+        self.assertAlmostEqual(1./6., prompt_only_importance_scores_1[0])
