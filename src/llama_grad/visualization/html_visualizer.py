@@ -29,7 +29,7 @@ class HtmlVisualizer:
         :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: html
         """
-        grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_nth_output(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling, max_gradient=max_gradient)
+        grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_nth_output(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling, max_gradient=max_gradient, prompt_only=prompt_only, ignore=ignore)
         grouped_input_tokens = [self.importance_calculator.tokenizer.decode(token) for token in grouped_input_token_ids]
         # Create html
         html_body = ""
@@ -68,7 +68,7 @@ class HtmlVisualizer:
         :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: html
         """
-        html_str = self.nth_output_to_html(output_token_index, max_gradient, groups, group_gradient_pooling)
+        html_str = self.nth_output_to_html(output_token_index, max_gradient, groups, group_gradient_pooling, prompt_only, ignore)
         dir_path, file_name = os.path.split(output_path)
         html2image = Html2Image(size=(800, 600), output_path=dir_path)
         html2image.screenshot(html_str=html_str, save_as=file_name)
@@ -100,5 +100,7 @@ class HtmlVisualizer:
                 output_path=os.path.join(output_dir, f"{i}.{file_extension}"),
                 max_gradient=max_gradient,
                 groups=groups,
-                group_gradient_pooling=group_gradient_pooling
+                group_gradient_pooling=group_gradient_pooling,
+                prompt_only=prompt_only,
+                ignore=ignore
             )
