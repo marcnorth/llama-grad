@@ -164,3 +164,33 @@ class TestInputImportanceCalculator(TestCase):
         self.assertEqual(6, len(prompt_only_importance_scores_0))
         self.assertEqual(6, len(prompt_only_importance_scores_1))
         self.assertAlmostEqual(1./6., prompt_only_importance_scores_1[0])
+
+    def test_ignore_values(self):
+        """
+        Can ignore groups in the input
+        :return:
+        """
+        tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        output_ids = \
+        tokenizer.batch_encode_plus(["test"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
+        token_with_gradients = TokenWithGradients()
+        token_with_gradients.token_ids = output_ids
+        token_with_gradients.gradients = Tensor([[1., 2., 3., 8., 5., 6., 7., 4.]])
+        importance_calculator = InputImportanceCalculator(
+            tokenizer,
+            prompt="code will ignore this but not this ignore",
+            token_with_gradients=token_with_gradients
+        )
+        # Default will use all inputs
+        importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(0)
+        self.assertEqual(8, len(importance_scores))
+        self.assertAlmostEqual(1./8., importance_scores[0])
+        self.assertAlmostEqual(3./8., importance_scores[2])
+        # Ignoring 'ignore this' and 'not' will remove those tokens from the calculated importance scores
+        importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(
+            0,
+            ignore=[" ignore this", " not"]
+        )
+        self.assertEqual(5, len(importance_scores))
+        self.assertAlmostEqual(1./7., importance_scores[0])  # 1. is first gradient and 7. is max gradient once 'this' is ignored
+        self.assertAlmostEqual(5./7., importance_scores[2])  # 5. is third gradient and 7. is max gradient once 'this' is ignored

@@ -36,20 +36,20 @@ class InputImportanceCalculator:
             groups: List[str] = [],
             group_gradient_pooling=Optional[GroupGradientPooling],
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
-            prompt_only: bool = False
+            prompt_only: bool = False,
+            ignore: List[str] = []
     ) -> Tuple[List[float], List[int]]:
         """
         Calculates the importance of each input token for the nth output token
+        :param output_token_index: The index of the output token to calculate importance for
+        :param groups: List of strings from input to group together
+        :param group_gradient_pooling: How to pool the gradients of grouped input tokens
+        :param max_gradient: The max value to use for calculating opacities. MaxGradient.SINGLE_OUTPUT (default) will use the maximum gradient for that output (i.e. that input will have importance=1), MaxGradient.ALL_OUTPUTS will use the maximum across all output tokens
+        :param prompt_only: Only use the prompt input tokens and gradients, not the previous appended output tokens
+        :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: Tuple[List of importance scores, List of token ids (or groups)]
         """
-        if prompt_only:
-            # Only use the prompt input tokens and gradients
-            input_ids = self.input_token_ids
-            input_gradients = self.token_with_gradients.gradients[output_token_index][:self.input_token_count]
-        else:
-            # Append the previous output tokens (0 to output_token_index-1) to the input
-            input_ids = self.input_token_ids + self.token_with_gradients.token_ids[:output_token_index].tolist()
-            input_gradients = self.token_with_gradients.gradients[output_token_index][:self.input_token_count + output_token_index]
+        input_ids, input_gradients = self._get_input_ids_for_nth_output_calculation(output_token_index, prompt_only, ignore)
         grouped_input_ids = []
         grouped_input_gradients = []
         continue_searching_from = 0  # Index to continue searching for group from
@@ -66,17 +66,17 @@ class InputImportanceCalculator:
             # Add all individual tokens before group, then add group
             if found_index > continue_searching_from:
                 grouped_input_ids.extend(input_ids[continue_searching_from:found_index])
-                grouped_input_gradients.extend(input_gradients[continue_searching_from:found_index].tolist())
+                grouped_input_gradients.extend(input_gradients[continue_searching_from:found_index])
             grouped_input_ids.append(group_token_ids)
             # Calculate group gradient using pooling strategy
             group_gradient = mean(input_gradients[found_index:found_index + len(
-                group_token_ids)].tolist()) if group_gradient_pooling == GroupGradientPooling.AVERAGE else max(
-                input_gradients[found_index:found_index + len(group_token_ids)].tolist())
+                group_token_ids)]) if group_gradient_pooling == GroupGradientPooling.AVERAGE else max(
+                input_gradients[found_index:found_index + len(group_token_ids)])
             grouped_input_gradients.append(group_gradient)
             continue_searching_from = found_index + len(group_token_ids)
         # Add any tokens not already added
         grouped_input_ids.extend(input_ids[continue_searching_from:])
-        grouped_input_gradients.extend(input_gradients[continue_searching_from:].tolist())
+        grouped_input_gradients.extend(input_gradients[continue_searching_from:])
         max_input_gradient = (
             max(grouped_input_gradients) if max_gradient == MaxGradient.SINGLE_OUTPUT else
             torch.max(self.token_with_gradients.gradients) if max_gradient == MaxGradient.ALL_OUTPUTS else
@@ -85,3 +85,29 @@ class InputImportanceCalculator:
             list(map(lambda g: g / max_input_gradient, grouped_input_gradients)),
             grouped_input_ids
         )
+
+    def _get_input_ids_for_nth_output_calculation(self, output_token_index: int, prompt_only: bool, ignore: List[str]) -> Tuple[List[int], List[float]]:
+        """
+        Returns the input token ids to use for calculating the nth output token
+        :param output_token_index: The index of the output token to calculate importance for
+        :param prompt_only: Only use the prompt input tokens and gradients, not the previous appended output tokens
+        :param ignore: List of string to ignore in the input (e.g. special tokens)
+        :return:
+        """
+        if prompt_only:
+            # Only use the prompt input tokens and gradients
+            input_ids = self.input_token_ids
+        else:
+            # Append the previous output tokens (0 to output_token_index-1) to the input
+            input_ids = self.input_token_ids + self.token_with_gradients.token_ids[:output_token_index].tolist()
+        for ignore_str in ignore:
+            # If ignore_str is in input_ids, change to None
+            ignore_token_ids = self.tokenizer.encode_plus(ignore_str)["input_ids"]
+            for i in range(0, len(input_ids) - len(ignore_token_ids) + 1):
+                if input_ids[i:i + len(ignore_token_ids)] == ignore_token_ids:
+                    input_ids[i:i + len(ignore_token_ids)] = [None] * len(ignore_token_ids)
+        # Only include gradients where input_ids is not None
+        gradients = self.token_with_gradients.gradients[output_token_index]
+        non_ignored_input_gradients = [gradient.item() for gradient, input_id in zip(gradients, input_ids) if input_id is not None]
+        input_ids = list(filter(lambda x: x is not None, input_ids))
+        return input_ids, non_ignored_input_gradients
