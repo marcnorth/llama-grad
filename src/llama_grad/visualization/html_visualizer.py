@@ -5,6 +5,10 @@ from html2image import Html2Image
 from llama_grad.input_importance_calculator import GroupGradientPooling, MaxGradient, InputImportanceCalculator
 
 
+class InputNotFoundException(Exception):
+    pass
+
+
 class HtmlVisualizer:
     def __init__(self, importance_calculator: InputImportanceCalculator):
         self.importance_calculator = importance_calculator
@@ -31,13 +35,23 @@ class HtmlVisualizer:
         """
         grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_nth_output(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling, max_gradient=max_gradient, prompt_only=prompt_only, ignore=ignore)
         grouped_input_tokens = [self.importance_calculator.tokenizer.decode(token) for token in grouped_input_token_ids]
+        flattened_input_token_ids = self._flattern_input_token_ids(grouped_input_token_ids)
+        whole_input = self.importance_calculator.tokenizer.decode(flattened_input_token_ids)
+        remaining_input = whole_input
         # Create html
         html_body = ""
-        for input_token_ids, input_tokens, input_importance in zip(grouped_input_token_ids, grouped_input_tokens,
-                                                                 grouped_input_importance):
+        for input_token_ids, input_tokens, input_importance in zip(grouped_input_token_ids, grouped_input_tokens, grouped_input_importance):
             if not isinstance(input_token_ids, list):
                 input_token_ids = [input_token_ids]
-            html_body += f"<span data-token-ids=\"[{','.join([str(tid) for tid in input_token_ids])}]\" style=\"background-color:rgba(255,0,0,{input_importance:.3f})\">{html.escape(input_tokens)}</span>"
+            found = False
+            for n_pad in range(4):
+                search_string = f"{' ' * n_pad}{input_tokens}"
+                if remaining_input.startswith(search_string):
+                    remaining_input = remaining_input[len(search_string):]
+                    found = True
+                    html_body += f"<span data-token-ids=\"[{','.join([str(tid) for tid in input_token_ids])}]\" style=\"background-color:rgba(255,0,0,{input_importance:.3f})\">{html.escape(input_tokens)}</span>"
+            if not found:
+                raise InputNotFoundException(f"Input '{input_tokens}' not found. remaining input:'{remaining_input}'")
         css = """
                 body {background-color:#fff}
                 span[data-token-ids] {font-size: 20px;}
@@ -45,6 +59,15 @@ class HtmlVisualizer:
         html_body = "<br/>".join(html_body.split("\n"))
         html_inc_head = f"<html><head><style>{css}</style></head><body>{html_body}</body></html>"
         return html_inc_head
+
+    def _flattern_input_token_ids(self, grouped_input_token_ids) -> List[int]:
+        flattened_input_token_ids = []
+        for input_token_ids in grouped_input_token_ids:
+            if isinstance(input_token_ids, list):
+                flattened_input_token_ids.extend(input_token_ids)
+            else:
+                flattened_input_token_ids.append(input_token_ids)
+        return flattened_input_token_ids
 
     def nth_output_to_image(
             self,
@@ -78,7 +101,7 @@ class HtmlVisualizer:
             output_dir: str,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None,,
+            group_gradient_pooling: Optional[GroupGradientPooling] = None,
             prompt_only: bool = False,
             ignore: List[str] = [],
             file_extension: str = 'png'
