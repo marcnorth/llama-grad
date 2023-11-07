@@ -89,6 +89,13 @@ class LlamaGrad:
             raise ModelEmbeddingNotSupported(f"Embedding model {type(self.model)} is not supported. To add an embedding function, call LlamaGrad.register_embedding_function()")
         return self.embedding_functions[type(self.model)](self.model, token_ids)
 
+    def generated_output(self) -> str:
+        """
+        Returns the generated output text
+        :return:
+        """
+        return self.tokenizer.decode(self.output_tokens_with_gradients.token_ids)
+
     def html_visualizer(self):
         return HtmlVisualizer(self.input_importance_calculator())
 
