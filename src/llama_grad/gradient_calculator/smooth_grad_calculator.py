@@ -37,6 +37,8 @@ class SmoothGradCalculator(GradientCalculator):
         """
         input_embeddings_with_noise = input_embeddings + torch.randn_like(input_embeddings) * self.sigma
 
+        input_embeddings_with_noise.retain_grad()
+
         if input_embeddings_with_noise.grad is not None:
             input_embeddings_with_noise.grad.zero_()
 
