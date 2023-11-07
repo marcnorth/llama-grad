@@ -10,7 +10,7 @@ class TokenWithGradients:
         # 2-D Tensor of gradients of size (output_sequence_length, input_size + self.token_ids.shape[0] - 1)
         self.gradients: Tensor = None
 
-    def append(self, other: Self):
+    def append(self, other: Self) -> None:
         if self.gradients is None:
             self.token_ids = other.token_ids.clone()
             self.gradients = other.gradients.clone()

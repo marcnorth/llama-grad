@@ -1,9 +1,12 @@
+from __future__ import annotations
+import json
 from enum import Enum
 from statistics import mean
-from typing import List, Tuple, Optional, Union
-
+from typing import List, Tuple, Optional, Union, TextIO
 import torch
-from transformers import PreTrainedTokenizerBase
+from torch import Tensor
+from transformers import PreTrainedTokenizerBase, AutoTokenizer
+
 from llama_grad import TokenWithGradients
 
 
@@ -111,3 +114,37 @@ class InputImportanceCalculator:
         non_ignored_input_gradients = [gradient.item() for gradient, input_id in zip(gradients, input_ids) if input_id is not None]
         input_ids = list(filter(lambda x: x is not None, input_ids))
         return input_ids, non_ignored_input_gradients
+
+    def save(self, file_handle: TextIO) -> None:
+        file_handle.seek(0)
+        # Json encode
+        json_dict = {
+            "tokenizer_name": self.tokenizer.name_or_path,
+            "prompt": self.prompt,
+            "token_with_gradients": {
+                "token_ids": self.token_with_gradients.token_ids.tolist(),
+                "gradients": self.token_with_gradients.gradients.tolist()
+            }
+        }
+        file_handle.write(json.dumps(json_dict))
+        file_handle.truncate()
+
+    @staticmethod
+    def load(file_handle: TextIO, tokenizer: Optional[PreTrainedTokenizerBase] = None) -> InputImportanceCalculator:
+        """
+        Loads an InputImportanceCalculator from a file handle
+        :param file_handle:
+        :param tokenizer: If None, will use the tokenizer_name in the file to load the tokenizer using AutoTokenizer.from_pretrained()
+        :return:
+        """
+        json_dict = json.load(file_handle)
+        if tokenizer is None:
+            tokenizer = AutoTokenizer.from_pretrained(json_dict["tokenizer_name"])
+        token_with_gradients = TokenWithGradients()
+        token_with_gradients.token_ids = Tensor(json_dict["token_with_gradients"]["token_ids"])
+        token_with_gradients.gradients = Tensor(json_dict["token_with_gradients"]["gradients"])
+        return InputImportanceCalculator(
+            tokenizer,
+            json_dict["prompt"],
+            token_with_gradients
+        )

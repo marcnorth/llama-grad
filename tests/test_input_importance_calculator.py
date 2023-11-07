@@ -1,3 +1,4 @@
+import tempfile
 from unittest import TestCase
 from torch import Tensor
 from transformers import GPT2Tokenizer
@@ -194,3 +195,32 @@ class TestInputImportanceCalculator(TestCase):
         self.assertEqual(5, len(importance_scores))
         self.assertAlmostEqual(1./7., importance_scores[0])  # 1. is first gradient and 7. is max gradient once 'this' is ignored
         self.assertAlmostEqual(5./7., importance_scores[2])  # 5. is third gradient and 7. is max gradient once 'this' is ignored
+
+    def test_save_and_load(self):
+        tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        output_ids = tokenizer.batch_encode_plus([" one two"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
+        token_with_gradients = TokenWithGradients()
+        token_with_gradients.token_ids = output_ids
+        token_with_gradients.gradients = Tensor([
+            [1., 4., 0.],
+            [3.3333333, 5., 10.]
+        ])
+        orig_importance_calculator = InputImportanceCalculator(
+            tokenizer,
+            prompt="Hello world",
+            token_with_gradients=token_with_gradients
+        )
+        # Save then load
+        with tempfile.TemporaryFile("w+") as file:
+            orig_importance_calculator.save(file)
+            file.seek(0)
+            importance_calculator = InputImportanceCalculator.load(file)
+            importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(0)
+            self.assertAlmostEqual(2, len(importance_scores))  # One for each input token
+            self.assertAlmostEqual(0.25, importance_scores[0])
+            self.assertAlmostEqual(1., importance_scores[1])
+            importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(1)
+            self.assertAlmostEqual(3, len(importance_scores))  # One for each input token
+            self.assertAlmostEqual(1. / 3., importance_scores[0])
+            self.assertAlmostEqual(0.5, importance_scores[1])
+            self.assertAlmostEqual(1., importance_scores[2])

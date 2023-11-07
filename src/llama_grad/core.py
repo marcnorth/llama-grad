@@ -96,10 +96,10 @@ class LlamaGrad:
         """
         return self.tokenizer.decode(self.output_tokens_with_gradients.token_ids)
 
-    def html_visualizer(self):
+    def html_visualizer(self) -> HtmlVisualizer:
         return HtmlVisualizer(self.input_importance_calculator())
 
-    def input_importance_calculator(self):
+    def input_importance_calculator(self) -> InputImportanceCalculator:
         return InputImportanceCalculator(
             self.tokenizer,
             self.prompt,
