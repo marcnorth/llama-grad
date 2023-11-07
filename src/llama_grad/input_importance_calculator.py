@@ -105,7 +105,7 @@ class InputImportanceCalculator:
             input_ids = self.input_token_ids + self.token_with_gradients.token_ids[:output_token_index].tolist()
         for ignore_str in ignore:
             # If ignore_str is in input_ids, change to None
-            ignore_token_ids = self.tokenizer.encode_plus(ignore_str)["input_ids"]
+            ignore_token_ids = self.tokenizer.encode_plus(ignore_str, add_special_tokens=False)["input_ids"]
             for i in range(0, len(input_ids) - len(ignore_token_ids) + 1):
                 if input_ids[i:i + len(ignore_token_ids)] == ignore_token_ids:
                     input_ids[i:i + len(ignore_token_ids)] = [None] * len(ignore_token_ids)
