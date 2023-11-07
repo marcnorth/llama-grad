@@ -49,7 +49,7 @@ class HtmlVisualizer:
                 if remaining_input.startswith(search_string):
                     remaining_input = remaining_input[len(search_string):]
                     found = True
-                    html_body += f"<span data-token-ids=\"[{','.join([str(tid) for tid in input_token_ids])}]\" style=\"background-color:rgba(255,0,0,{input_importance:.3f})\">{html.escape(search_string).replace(' ', '&nbsp')}</span>"
+                    html_body += f"<span data-token-ids=\"[{','.join([str(tid) for tid in input_token_ids])}]\" style=\"background-color:rgba(255,0,0,{input_importance:.3f})\">{html.escape(search_string).replace(' ', '&nbsp;')}</span>"
             if not found:
                 raise InputNotFoundException(f"Input '{input_tokens}' not found. remaining input:'{remaining_input}'")
         css = """
