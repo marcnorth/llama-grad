@@ -49,6 +49,7 @@ class HtmlVisualizer:
                 if remaining_input.startswith(search_string):
                     remaining_input = remaining_input[len(search_string):]
                     found = True
+                    print(f"  Found at beginning with {n_pad} spaces")
                     html_body += f"<span data-token-ids=\"[{','.join([str(tid) for tid in input_token_ids])}]\" style=\"background-color:rgba(255,0,0,{input_importance:.3f})\">{html.escape(input_tokens)}</span>"
             if not found:
                 raise InputNotFoundException(f"Input '{input_tokens}' not found. remaining input:'{remaining_input}'")
