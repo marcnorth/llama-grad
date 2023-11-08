@@ -46,7 +46,7 @@ class SmoothGradCalculator(GradientCalculator):
 
         # output is batch, but batch size is always one
         model.zero_grad()
-        current_logits = output.logits[0].sum()
+        current_logits = output.logits[0].max()
         current_logits.backward(retain_graph=True)
 
         # Magnitude of gradient for w.r.t each input token
