@@ -56,7 +56,7 @@ class HtmlVisualizer:
                 body {background-color:#fff}
                 span[data-token-ids] {font-size: 20px;}
                 """
-        html_body = "<br/>".join(html_body.split("\n"))
+        html_body = "&#8629;<br/>".join(html_body.split("\n"))
         html_inc_head = f"<html><head><style>{css}</style></head><body>{html_body}</body></html>"
         return html_inc_head
 

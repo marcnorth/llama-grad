@@ -171,5 +171,5 @@ class TestHtml(TestCase):
         self.assertEqual(4, len(matches))
         self.assertEqual("Hello", matches[0][2])
         self.assertEqual("&gt;", matches[1][2])
-        self.assertEqual("<br/>", matches[2][2])
+        self.assertEqual("&#8629;<br/>", matches[2][2])
         self.assertEqual("world", matches[3][2])
