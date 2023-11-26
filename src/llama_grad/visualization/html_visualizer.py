@@ -1,5 +1,5 @@
 import html
-import os
+import re
 from typing import List, Union, Optional
 from html2image import Html2Image
 from llama_grad.input_importance_calculator import GroupGradientPooling, MaxGradient, InputImportanceCalculator
@@ -72,7 +72,8 @@ class HtmlVisualizer:
     def nth_output_to_image(
             self,
             output_token_index: int,
-            output_path: str,
+            output_dir: str,
+            output_file_name: Optional[str] = None,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
             group_gradient_pooling: Optional[GroupGradientPooling] = None,
@@ -83,7 +84,8 @@ class HtmlVisualizer:
         Outputs the gradients of specified output token w.r.t. each input token
         By default 100% opacity is the max gradient
         :param output_token_index: The index of the output token
-        :param output_path: Path to output image to
+        :param output_dir:
+        :param output_file_name:
         :param max_gradient: The max value to use for calculating opacities. MaxGradient.SINGLE_OUTPUT (default) will use the maximum gradient for that output (i.e. that input will have opacity=1), MaxGradient.ALL_OUTPUTS will use the maximum across all output tokens
         :param groups: List of string to group gradients by. Gradients will be calculated according to group_gradient_pooling strategy
         :param group_gradient_pooling: How to pool the gradients of groups
@@ -91,10 +93,22 @@ class HtmlVisualizer:
         :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: html
         """
-        html_str = self.nth_output_to_html(output_token_index, max_gradient, groups, group_gradient_pooling, prompt_only, ignore)
-        dir_path, file_name = os.path.split(output_path)
-        html2image = Html2Image(size=(800, 600), output_path=dir_path)
-        html2image.screenshot(html_str=html_str, save_as=file_name)
+        if output_file_name is None:
+            nth_token_id = self.importance_calculator.token_with_gradients.token_ids[output_token_index].item()
+            nth_token = self.importance_calculator.tokenizer.decode(nth_token_id)
+            if re.search(r"[^A-Za-z0-9 ()_\-,.]$", nth_token):
+                nth_token = f"token_{output_token_index}"
+            output_file_name = f"{output_token_index}_{nth_token.strip()}.png"
+        html_str = self.nth_output_to_html(
+            output_token_index,
+            max_gradient=max_gradient,
+            groups=groups,
+            group_gradient_pooling=group_gradient_pooling,
+            prompt_only=prompt_only,
+            ignore=ignore
+        )
+        html2image = Html2Image(size=(800, 600), output_path=output_dir)
+        html2image.screenshot(html_str=html_str, save_as=output_file_name)
 
     def all_outputs_to_image(
             self,
@@ -120,7 +134,7 @@ class HtmlVisualizer:
         for i in range(self.importance_calculator.token_with_gradients.token_ids.shape[0]):
             self.nth_output_to_image(
                 i,
-                output_path=os.path.join(output_dir, f"{i}.{file_extension}"),
+                output_dir=output_dir,
                 max_gradient=max_gradient,
                 groups=groups,
                 group_gradient_pooling=group_gradient_pooling,
