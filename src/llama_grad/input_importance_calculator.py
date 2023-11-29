@@ -15,6 +15,11 @@ class GroupGradientPooling(Enum):
     MAX = 2
 
 
+class OutputGradientPooling(Enum):
+    AVERAGE = 1
+    MAX = 2
+
+
 class MaxGradient(Enum):
     ALL_OUTPUTS = 1  # Uses max gradient across all outputs
     SINGLE_OUTPUT = 2  # Uses max gradient of only the output html is being generated for
@@ -33,11 +38,29 @@ class InputImportanceCalculator:
         self.input_token_count = len(self.input_token_ids)
         self.token_with_gradients = token_with_gradients
 
+    def calculate_importance_for_all_outputs(
+            self,
+            output_gradient_pooling: OutputGradientPooling = OutputGradientPooling.AVERAGE,
+            groups: List[str] = [],
+            group_gradient_pooling: Optional[GroupGradientPooling] = GroupGradientPooling.AVERAGE,
+            ignore: List[str] = []
+    ) -> Tuple[List[float], List[int]]:
+        """
+        Calculates the importance of each input token for all outputs
+        :return: Tuple[List of importance scores, List of token ids (or groups)]
+        """
+        input_ids = self._get_input_ids_for_calculation(prompt_only=True, ignore=ignore)
+        pooled_gradients = torch.mean(self.token_with_gradients.gradients[:, :len(input_ids)], dim=0) \
+            if output_gradient_pooling == OutputGradientPooling.AVERAGE else \
+            torch.max(self.token_with_gradients.gradients[:, :len(input_ids)], dim=0).values
+        input_gradients = [gradient.item() for gradient, input_id in zip(pooled_gradients, input_ids) if input_id is not None]
+        return self._calculate_grouped_importance(input_ids, input_gradients, groups, group_gradient_pooling, MaxGradient.SINGLE_OUTPUT)
+
     def calculate_importance_for_nth_output(
             self,
             output_token_index: int,
             groups: List[str] = [],
-            group_gradient_pooling=Optional[GroupGradientPooling],
+            group_gradient_pooling: Optional[GroupGradientPooling] = GroupGradientPooling.AVERAGE,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             prompt_only: bool = False,
             ignore: List[str] = []
@@ -52,7 +75,23 @@ class InputImportanceCalculator:
         :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: Tuple[List of importance scores, List of token ids (or groups)]
         """
-        input_ids, input_gradients = self._get_input_ids_for_nth_output_calculation(output_token_index, prompt_only, ignore)
+        input_ids = self._get_input_ids_for_calculation(output_token_index, prompt_only, ignore)
+        # Only include gradients where input_ids is not None
+        gradients = self.token_with_gradients.gradients[output_token_index]
+        input_gradients = [gradient.item() for gradient, input_id in zip(gradients, input_ids) if input_id is not None]
+        return self._calculate_grouped_importance(input_ids, input_gradients, groups, group_gradient_pooling, max_gradient)
+
+    def _calculate_grouped_importance(self, input_ids: List[Optional[int]], input_gradients: List[float], groups: List[str], group_gradient_pooling: GroupGradientPooling, max_gradient: Union[MaxGradient, float]) -> Tuple[List[float], List[int]]:
+        """
+        Groups gradients and calculates importance
+        :param input_ids:
+        :param input_gradients:
+        :param groups:
+        :param group_gradient_pooling:
+        :param max_gradient:
+        :return: Tuple[List of importance scores, List of token ids (or groups)]
+        """
+        input_ids = list(filter(lambda x: x is not None, input_ids))
         grouped_input_ids = []
         grouped_input_gradients = []
         continue_searching_from = 0  # Index to continue searching for group from
@@ -82,20 +121,20 @@ class InputImportanceCalculator:
         grouped_input_gradients.extend(input_gradients[continue_searching_from:])
         max_input_gradient = (
             max(grouped_input_gradients) if max_gradient == MaxGradient.SINGLE_OUTPUT else
-            torch.max(self.token_with_gradients.gradients) if max_gradient == MaxGradient.ALL_OUTPUTS else
+            torch.max(self.token_with_gradients.gradients).item() if max_gradient == MaxGradient.ALL_OUTPUTS else
             max_gradient)
         return (
             list(map(lambda g: g / max_input_gradient, grouped_input_gradients)),
             grouped_input_ids
         )
 
-    def _get_input_ids_for_nth_output_calculation(self, output_token_index: int, prompt_only: bool, ignore: List[str]) -> Tuple[List[int], List[float]]:
+    def _get_input_ids_for_calculation(self, output_token_index: Optional[int] = None, prompt_only: bool = False, ignore: List[str] = []) -> List[Optional[int]]:
         """
         Returns the input token ids to use for calculating the nth output token
-        :param output_token_index: The index of the output token to calculate importance for
+        :param output_token_index: The index of the output token to calculate importance for (None if all outputs). Must be non-None if prompt_only is False
         :param prompt_only: Only use the prompt input tokens and gradients, not the previous appended output tokens
         :param ignore: List of string to ignore in the input (e.g. special tokens)
-        :return:
+        :return: input_id will be None if the token should be ignored
         """
         if prompt_only:
             # Only use the prompt input tokens and gradients
@@ -109,11 +148,7 @@ class InputImportanceCalculator:
             for i in range(0, len(input_ids) - len(ignore_token_ids) + 1):
                 if input_ids[i:i + len(ignore_token_ids)] == ignore_token_ids:
                     input_ids[i:i + len(ignore_token_ids)] = [None] * len(ignore_token_ids)
-        # Only include gradients where input_ids is not None
-        gradients = self.token_with_gradients.gradients[output_token_index]
-        non_ignored_input_gradients = [gradient.item() for gradient, input_id in zip(gradients, input_ids) if input_id is not None]
-        input_ids = list(filter(lambda x: x is not None, input_ids))
-        return input_ids, non_ignored_input_gradients
+        return input_ids
 
     def save(self, file_handle: TextIO) -> None:
         file_handle.seek(0)
