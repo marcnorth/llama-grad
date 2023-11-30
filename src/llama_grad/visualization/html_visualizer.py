@@ -2,7 +2,8 @@ import html
 import re
 from typing import List, Union, Optional
 from html2image import Html2Image
-from llama_grad.input_importance_calculator import GroupGradientPooling, MaxGradient, InputImportanceCalculator
+from llama_grad.input_importance_calculator import GroupGradientPooling, MaxGradient, InputImportanceCalculator, \
+    OutputGradientPooling
 
 
 class InputNotFoundException(Exception):
@@ -20,7 +21,8 @@ class HtmlVisualizer:
             groups: List[str] = [],
             group_gradient_pooling: Optional[GroupGradientPooling] = None,
             prompt_only: bool = False,
-            ignore: List[str] = []
+            ignore: List[str] = [],
+            ignore_non_grouped_input_tokens: bool = False
     ) -> str:
         """
         Outputs the gradients of specified output token w.r.t. each input token
@@ -33,7 +35,21 @@ class HtmlVisualizer:
         :param ignore: List of string to ignore in the input (e.g. special tokens)
         :return: html
         """
-        grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_nth_output(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling, max_gradient=max_gradient, prompt_only=prompt_only, ignore=ignore)
+        grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_nth_output(output_token_index, groups=groups, group_gradient_pooling=group_gradient_pooling, max_gradient=max_gradient, prompt_only=prompt_only, ignore=ignore, ignore_non_grouped_input_tokens=ignore_non_grouped_input_tokens)
+        return self._grouped_input_importance_to_html(grouped_input_importance, grouped_input_token_ids)
+
+    def all_outputs_to_html(
+            self,
+            output_gradient_pooling: OutputGradientPooling = OutputGradientPooling.AVERAGE,
+            groups: List[str] = [],
+            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            ignore: List[str] = [],
+            ignore_non_grouped_input_tokens: bool = False
+    ) -> str:
+        grouped_input_importance, grouped_input_token_ids = self.importance_calculator.calculate_importance_for_all_outputs(output_gradient_pooling=output_gradient_pooling, groups=groups, group_gradient_pooling=group_gradient_pooling, ignore=ignore, ignore_non_grouped_input_tokens=ignore_non_grouped_input_tokens)
+        return self._grouped_input_importance_to_html(grouped_input_importance, grouped_input_token_ids)
+
+    def _grouped_input_importance_to_html(self, grouped_input_importance: List[float], grouped_input_token_ids: List[int]) -> str:
         grouped_input_tokens = [self.importance_calculator.tokenizer.decode(token) for token in grouped_input_token_ids]
         flattened_input_token_ids = self._flattern_input_token_ids(grouped_input_token_ids)
         whole_input = self.importance_calculator.tokenizer.decode(flattened_input_token_ids)

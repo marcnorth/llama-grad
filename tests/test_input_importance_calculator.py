@@ -141,6 +141,45 @@ class TestInputImportanceCalculator(TestCase):
         self.assertAlmostEqual(0.75, importance_scores[3])  # = 6 / 8 = 0.75
         self.assertAlmostEqual(1., importance_scores[4])  # = max(7,8) / 8 = 1
 
+    def test_ignore_non_grouped(self):
+        tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        output_ids = tokenizer.batch_encode_plus(["test"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
+        token_with_gradients = TokenWithGradients()
+        token_with_gradients.token_ids = output_ids
+        token_with_gradients.gradients = Tensor([[1., 2., 3., 4., 5., 8., 7., 6.]])
+        importance_calculator = InputImportanceCalculator(
+            tokenizer,
+            prompt=" Group one Group two Not part Group one",
+            token_with_gradients=token_with_gradients
+        )
+        # Don't ignore non-grouped tokens (Max gradient is 8)
+        importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(
+            0,
+            groups=[" Group one", " Group two", " Group one"],
+            group_gradient_pooling=GroupGradientPooling.AVERAGE,
+            ignore_non_grouped_input_tokens=False
+        )
+        self.assertAlmostEqual(5, len(importance_scores))
+        self.assertAlmostEqual(0.1875, importance_scores[0])  # = ((1 + 2) / 2) / 8 = 0.
+        self.assertAlmostEqual(7. / 16., importance_scores[1])  # = ((3 + 4) / 2) / 8 = 0.467
+        self.assertAlmostEqual(0.625, importance_scores[2])  # = 5 / 8 = 0.625
+        self.assertAlmostEqual(1., importance_scores[3])  # = 8 / 8 = 1
+        self.assertAlmostEqual(0.8125, importance_scores[4])  # = 6.5 / 8 = 1
+        # Ignore non-grouped tokens (Max gradient is 6.5)
+        importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(
+            0,
+            groups=[" Group one", " Group two", " Group one"],
+            group_gradient_pooling=GroupGradientPooling.AVERAGE,
+            ignore_non_grouped_input_tokens=True
+        )
+        print(importance_scores)
+        self.assertAlmostEqual(5, len(importance_scores))
+        self.assertAlmostEqual(0.23076923, importance_scores[0])  # = ((1 + 2) / 2) / 6.5 = 0.2
+        self.assertAlmostEqual(0.53846154, importance_scores[1])  # = ((3 + 4) / 2) / 6.5 = 0.467
+        self.assertAlmostEqual(0., importance_scores[2])  # Ignored
+        self.assertAlmostEqual(0., importance_scores[3])  # Ignored
+        self.assertAlmostEqual(1., importance_scores[4])  # = 6.5 / 6.5 = 1
+
     def test_prompt_only(self):
         """
         Calculates importance and max using ONLY the original prompt
