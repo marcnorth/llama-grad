@@ -53,7 +53,7 @@ class LlamaGrad:
         """
         if stop_tokens is None:
             stop_tokens = [self.tokenizer.eos_token]
-        stop_token_ids = [self.tokenizer.encode(stop_token)[0] for stop_token in stop_tokens]
+        stop_token_ids = [self.tokenizer.encode(stop_token, add_special_tokens=False)[0] for stop_token in stop_tokens]
         # Loop through next_token until max_length or until we reach stop token
         target_token_count = self.output_tokens_with_gradients.token_ids.shape[0] + max_output_length if max_output_length is not None else None
         self.next_token()
