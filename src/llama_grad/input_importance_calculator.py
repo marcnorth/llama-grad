@@ -107,10 +107,12 @@ class InputImportanceCalculator:
         continue_searching_from = 0  # Index to continue searching for group from
         for group in groups:
             # Look for group in input_ids
-            group_token_ids = self.tokenizer.encode_plus(group)["input_ids"]
+            group_token_ids = self.tokenizer.encode(group, add_special_tokens=False)
             found_index = None
             for i in range(continue_searching_from, len(input_ids) - len(group_token_ids) + 1):
-                if input_ids[i:i + len(group_token_ids)] == group_token_ids:
+                # For consistency, decode then encode the sequence we're checking against (sequence may have been encoded differently when part of a larger sequence)
+                decoded_then_encoded = self.tokenizer.encode(self.tokenizer.decode(input_ids[i:i + len(group_token_ids)]), add_special_tokens=False)
+                if decoded_then_encoded == group_token_ids:
                     found_index = i
                     break
             if found_index is None:

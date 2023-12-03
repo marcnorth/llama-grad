@@ -1,7 +1,7 @@
 import tempfile
 from unittest import TestCase
 from torch import Tensor
-from transformers import GPT2Tokenizer
+from transformers import GPT2Tokenizer, AutoTokenizer
 from llama_grad import TokenWithGradients
 from llama_grad.input_importance_calculator import InputImportanceCalculator, MaxGradient, GroupGradientPooling, \
     OutputGradientPooling
@@ -172,13 +172,33 @@ class TestInputImportanceCalculator(TestCase):
             group_gradient_pooling=GroupGradientPooling.AVERAGE,
             ignore_non_grouped_input_tokens=True
         )
-        print(importance_scores)
         self.assertAlmostEqual(5, len(importance_scores))
         self.assertAlmostEqual(0.23076923, importance_scores[0])  # = ((1 + 2) / 2) / 6.5 = 0.2
         self.assertAlmostEqual(0.53846154, importance_scores[1])  # = ((3 + 4) / 2) / 6.5 = 0.467
         self.assertAlmostEqual(0., importance_scores[2])  # Ignored
         self.assertAlmostEqual(0., importance_scores[3])  # Ignored
         self.assertAlmostEqual(1., importance_scores[4])  # = 6.5 / 6.5 = 1
+
+    def test_non_bijective_mapping(self):
+        """
+        Input sequences can be encoded differently when part of a longer sequence e.g. code llama's tokenizer
+        where a token after a new line as treated differently to the same token at the beginning of an input
+        :return:
+        """
+        tokenizer = AutoTokenizer.from_pretrained("codellama/CodeLlama-7b-hf")
+        token_with_gradients = TokenWithGradients()
+        token_with_gradients.token_ids = tokenizer.batch_encode_plus(["output"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
+        token_with_gradients.gradients = Tensor([[1., 2., 3., 4., 5.]])
+        importance_calculator = InputImportanceCalculator(
+            tokenizer,
+            prompt="Line one\nLine two",
+            token_with_gradients=token_with_gradients
+        )
+        importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(
+            0,
+            groups=["Line one", "Line two"]
+        )
+        self.assertEqual(3, len(importance_scores))
 
     def test_prompt_only(self):
         """
