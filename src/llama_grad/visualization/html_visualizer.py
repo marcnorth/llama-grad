@@ -85,6 +85,28 @@ class HtmlVisualizer:
                 flattened_input_token_ids.append(input_token_ids)
         return flattened_input_token_ids
 
+    def all_outputs_to_image(
+            self,
+            output_dir: str,
+            output_file_name: Optional[str] = None,
+            output_gradient_pooling: OutputGradientPooling = OutputGradientPooling.AVERAGE,
+            groups: List[str] = [],
+            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            ignore: List[str] = [],
+            ignore_non_grouped_input_tokens: bool = False
+    ) -> None:
+        if output_file_name is None:
+            output_file_name = "all_outputs.png"
+        html_str = self.all_outputs_to_html(
+            output_gradient_pooling=output_gradient_pooling,
+            groups=groups,
+            group_gradient_pooling=group_gradient_pooling,
+            ignore=ignore,
+            ignore_non_grouped_input_tokens=ignore_non_grouped_input_tokens
+        )
+        html2image = Html2Image(size=(800, 600), output_path=output_dir)
+        html2image.screenshot(html_str=html_str, save_as=output_file_name)
+
     def nth_output_to_image(
             self,
             output_token_index: int,
@@ -126,7 +148,7 @@ class HtmlVisualizer:
         html2image = Html2Image(size=(800, 600), output_path=output_dir)
         html2image.screenshot(html_str=html_str, save_as=output_file_name)
 
-    def all_outputs_to_image(
+    def every_outputs_to_image(
             self,
             output_dir: str,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
