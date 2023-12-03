@@ -82,3 +82,26 @@ class TestLlamaGrad(TestCase):
         self.assertEqual((4, 8), result2.gradients.shape)  # five output tokens, 4 gradient magnitudes for each of the accumulated input tokens and three for the new outputs
         self.assertEqual((7,), llama_grad.output_tokens_with_gradients.token_ids.shape)
         self.assertEqual((7, 8), llama_grad.output_tokens_with_gradients.gradients.shape)
+
+    def test_stop_token(self):
+        model = GPT2LMHeadModel.from_pretrained("distilgpt2")
+        tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        tokenizer.pad_token = tokenizer.eos_token
+        # Without stop token, ends after max_output_length
+        llama_grad = LlamaGrad(
+            model,
+            "Hi, how are", # Will be completed to "Hi, how are you going to do it?"
+            tokenizer=tokenizer,
+            gradient_calculator=SimpleGradientCalculator()
+        )
+        result = llama_grad.generate(max_output_length=10)
+        self.assertEqual(10, result.token_ids.shape[0])
+        # With stop token, ends after stop_token
+        llama_grad = LlamaGrad(
+            model,
+            "Hi, how are", # Will be completed to "Hi, how are you going to do it?"
+            tokenizer=tokenizer,
+            gradient_calculator=SimpleGradientCalculator()
+        )
+        result = llama_grad.generate(max_output_length=10, stop_tokens=["?"])
+        self.assertEqual(6, result.token_ids.shape[0])

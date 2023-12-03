@@ -19,7 +19,7 @@ class HtmlVisualizer:
             output_token_index: int,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            group_gradient_pooling: GroupGradientPooling = GroupGradientPooling.AVERAGE,
             prompt_only: bool = False,
             ignore: List[str] = [],
             ignore_non_grouped_input_tokens: bool = False
@@ -42,7 +42,7 @@ class HtmlVisualizer:
             self,
             output_gradient_pooling: OutputGradientPooling = OutputGradientPooling.AVERAGE,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            group_gradient_pooling: GroupGradientPooling = GroupGradientPooling.AVERAGE,
             ignore: List[str] = [],
             ignore_non_grouped_input_tokens: bool = False
     ) -> str:
@@ -91,7 +91,7 @@ class HtmlVisualizer:
             output_file_name: Optional[str] = None,
             output_gradient_pooling: OutputGradientPooling = OutputGradientPooling.AVERAGE,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            group_gradient_pooling: GroupGradientPooling = GroupGradientPooling.AVERAGE,
             ignore: List[str] = [],
             ignore_non_grouped_input_tokens: bool = False
     ) -> None:
@@ -114,7 +114,7 @@ class HtmlVisualizer:
             output_file_name: Optional[str] = None,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            group_gradient_pooling: GroupGradientPooling = GroupGradientPooling.AVERAGE,
             prompt_only: bool = False,
             ignore: List[str] = []
     ):
@@ -153,7 +153,7 @@ class HtmlVisualizer:
             output_dir: str,
             max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             groups: List[str] = [],
-            group_gradient_pooling: Optional[GroupGradientPooling] = None,
+            group_gradient_pooling: GroupGradientPooling = GroupGradientPooling.AVERAGE,
             prompt_only: bool = False,
             ignore: List[str] = [],
             file_extension: str = 'png'
