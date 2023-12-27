@@ -47,7 +47,8 @@ class InputImportanceCalculator:
             ignore_non_grouped_input_tokens: bool = False
     ) -> Tuple[List[float], List[int]]:
         """
-        Calculates the importance of each input token for all outputs
+        Calculates the importance of each input token for all outputs.
+        Ignored tokens will have importance=0
         :return: Tuple[List of importance scores, List of token ids (or groups)]
         """
         input_ids = self._get_input_ids_for_calculation(prompt_only=True, ignore=ignore)
@@ -116,7 +117,7 @@ class InputImportanceCalculator:
                     found_index = i
                     break
             if found_index is None:
-                raise ValueError(f"Group '{group}' not found")
+                raise ValueError(f"Group '{group}' not found in '{self.prompt}'")
             # Add all individual tokens before group, then add group
             if found_index > continue_searching_from:
                 grouped_input_ids.extend(input_ids[continue_searching_from:found_index])
@@ -188,8 +189,8 @@ class InputImportanceCalculator:
         if tokenizer is None:
             tokenizer = AutoTokenizer.from_pretrained(json_dict["tokenizer_name"])
         token_with_gradients = TokenWithGradients()
-        token_with_gradients.token_ids = Tensor(json_dict["token_with_gradients"]["token_ids"])
-        token_with_gradients.gradients = Tensor(json_dict["token_with_gradients"]["gradients"])
+        token_with_gradients.token_ids = torch.IntTensor(json_dict["token_with_gradients"]["token_ids"])
+        token_with_gradients.gradients = torch.FloatTensor(json_dict["token_with_gradients"]["gradients"])
         return InputImportanceCalculator(
             tokenizer,
             json_dict["prompt"],
