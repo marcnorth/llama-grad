@@ -137,7 +137,7 @@ class InputImportanceCalculator:
             torch.max(self.token_with_gradients.gradients).item() if max_gradient == MaxGradient.ALL_OUTPUTS else
             max_gradient)
         return (
-            list(map(lambda g: g / max_input_gradient, grouped_input_gradients)),
+            list(map(lambda g: g / max_input_gradient, grouped_input_gradients)) if max_input_gradient != 0 else [0] * len(grouped_input_gradients),
             grouped_input_ids
         )
 

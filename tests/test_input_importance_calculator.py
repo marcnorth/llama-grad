@@ -81,7 +81,33 @@ class TestInputImportanceCalculator(TestCase):
         )
         self.assertAlmostEqual(0.125, importance_scores[0])
         self.assertAlmostEqual(0.5, importance_scores[1])
-        
+
+    def test_max_gradient_of_zero(self):
+        """
+        A max gradient of zero should not result in division by zero error
+        :return:
+        """
+        tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        output_ids = \
+        tokenizer.batch_encode_plus([" one two"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
+        token_with_gradients = TokenWithGradients()
+        token_with_gradients.token_ids = output_ids
+        token_with_gradients.gradients = Tensor([
+            [0., 0., 0.],
+            [0., 0., 0.]
+        ])
+        importance_calculator = InputImportanceCalculator(
+            tokenizer,
+            prompt="Hello world",
+            token_with_gradients=token_with_gradients
+        )
+        importance_scores, _ = importance_calculator.calculate_importance_for_nth_output(
+            0,
+            max_gradient=MaxGradient.SINGLE_OUTPUT
+        )
+        self.assertAlmostEqual(0., importance_scores[0])
+        self.assertAlmostEqual(0., importance_scores[1])
+
     def test_grouping(self):
         """
         Input tokens can be grouped when drawing gradients using different pooling strategies
