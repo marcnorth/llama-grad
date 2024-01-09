@@ -167,6 +167,53 @@ class TestInputImportanceCalculator(TestCase):
         self.assertAlmostEqual(0.75, importance_scores[3])  # = 6 / 8 = 0.75
         self.assertAlmostEqual(1., importance_scores[4])  # = max(7,8) / 8 = 1
 
+    def test_excluding_based_on_z_score(self):
+        # Exclude values with a z-score greater than 2 BEFORE pooling gradient across all outputs into a single value for each input
+        tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        output_ids = tokenizer.batch_encode_plus([" one two three"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]
+        token_with_gradients = TokenWithGradients()
+        token_with_gradients.token_ids = output_ids
+        token_with_gradients.gradients = Tensor([
+            [1., 2., 0., 0.],
+            [2., 5., 1., 0.],
+            [5., 6., 1., 1.],
+        ])
+        importance_calculator = InputImportanceCalculator(
+            tokenizer,
+            prompt="Hello world",
+            token_with_gradients=token_with_gradients
+        )
+        # All outputs (Average pooling), include all z-scores
+        importance_scores, _ = importance_calculator.calculate_importance_for_all_outputs(
+            output_gradient_pooling=OutputGradientPooling.AVERAGE
+        )
+        self.assertAlmostEqual(2, len(importance_scores))  # One for each input token (all_outputs only makes sense with prompt_only=True)
+        self.assertAlmostEqual(0.61538461538, importance_scores[0])  # Each gradient is averaged across all outputs = AVERAGE(1,2,5) / AVERAGE(2,5,6)
+        self.assertAlmostEqual(1., importance_scores[1])  # Each gradient is averaged across all outputs = AVG(2,5,6) / AVG(2,5,6)
+        # All outputs (Max pooling), include all z-scores
+        importance_scores, _ = importance_calculator.calculate_importance_for_all_outputs(
+            output_gradient_pooling=OutputGradientPooling.MAX
+        )
+        self.assertAlmostEqual(2, len(importance_scores))
+        self.assertAlmostEqual(5./6., importance_scores[0])  # Each gradient is maxed across all outputs = MAX(1,2,5) / MAX(2,5,6)
+        self.assertAlmostEqual(1., importance_scores[1])  # Each gradient is maxed across all outputs = MAX(4,5) / MAX(4,5)
+        # All outputs (Average pooling), exclude some z-scores
+        importance_scores, _ = importance_calculator.calculate_importance_for_all_outputs(
+            output_gradient_pooling=OutputGradientPooling.AVERAGE,
+            exclude_z_scores_greater_than=1.
+        )
+        self.assertAlmostEqual(2, len(importance_scores))  # One for each input token (all_outputs only makes sense with prompt_only=True)
+        self.assertAlmostEqual(1.5/5.5, importance_scores[0])  # Each gradient is averaged across all outputs = AVERAGE(1,2) / AVERAGE(5,6) - 5 and 2 are excluded
+        self.assertAlmostEqual(1., importance_scores[1])  # Each gradient is averaged across all outputs = AVG(5,6) / AVG(5,6) - 2 is excluded
+        # All outputs (Max pooling), exclude some z-scores
+        importance_scores, _ = importance_calculator.calculate_importance_for_all_outputs(
+            output_gradient_pooling=OutputGradientPooling.MAX,
+            exclude_z_scores_greater_than=1.
+        )
+        self.assertAlmostEqual(2, len(importance_scores))
+        self.assertAlmostEqual(2./6., importance_scores[0])  # Each gradient is maxed across all outputs = MAX(1,2) / MAX(5,6) - 5 and 2 are excluded
+        self.assertAlmostEqual(1., importance_scores[1])  # Each gradient is maxed across all outputs = AVG(5,6) / AVG(5,6) - 2 is excluded
+
     def test_ignore_non_grouped(self):
         tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
         output_ids = tokenizer.batch_encode_plus(["test"], return_tensors="pt", add_special_tokens=False)["input_ids"][0]

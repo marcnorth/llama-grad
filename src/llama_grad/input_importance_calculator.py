@@ -6,6 +6,7 @@ from typing import List, Tuple, Optional, Union, TextIO
 import torch
 from torch import Tensor
 from transformers import PreTrainedTokenizerBase, AutoTokenizer
+import statistics
 
 from llama_grad import TokenWithGradients
 
@@ -44,7 +45,8 @@ class InputImportanceCalculator:
             groups: List[str] = [],
             group_gradient_pooling: Optional[GroupGradientPooling] = GroupGradientPooling.AVERAGE,
             ignore: List[str] = [],
-            ignore_non_grouped_input_tokens: bool = False
+            ignore_non_grouped_input_tokens: bool = False,
+            exclude_z_scores_greater_than: float=None
     ) -> Tuple[List[float], List[int]]:
         """
         Calculates the importance of each input token for all outputs.
@@ -52,11 +54,21 @@ class InputImportanceCalculator:
         :return: Tuple[List of importance scores, List of token ids (or groups)]
         """
         input_ids = self._get_input_ids_for_calculation(prompt_only=True, ignore=ignore)
-        pooled_gradients = torch.mean(self.token_with_gradients.gradients[:, :len(input_ids)], dim=0) \
+        input_gradients = self.token_with_gradients.gradients[:, :len(input_ids)].T.tolist()
+        if exclude_z_scores_greater_than is not None:
+            input_gradints_with_high_z_scores_removed = []
+            for gradients_for_input in input_gradients:
+                average = sum(gradients_for_input) / len(gradients_for_input)
+                standard_deviation = statistics.pstdev(gradients_for_input)
+                z_scores = [(gradient-average)/standard_deviation for gradient in gradients_for_input]
+                filtered_on_z_score = [gradient for gradient in gradients_for_input if abs((gradient-average)/standard_deviation) <= exclude_z_scores_greater_than]
+                input_gradints_with_high_z_scores_removed.append(filtered_on_z_score)
+            input_gradients = input_gradints_with_high_z_scores_removed
+        pooled_gradients = [mean(gradients)/len(gradients) for gradients in input_gradients] \
             if output_gradient_pooling == OutputGradientPooling.AVERAGE else \
-            torch.max(self.token_with_gradients.gradients[:, :len(input_ids)], dim=0).values
-        input_gradients = [gradient.item() for gradient, input_id in zip(pooled_gradients, input_ids) if input_id is not None]
-        return self._calculate_grouped_importance(input_ids, input_gradients, groups, group_gradient_pooling, MaxGradient.SINGLE_OUTPUT, ignore_non_grouped_input_tokens=ignore_non_grouped_input_tokens)
+            [max(gradients) for gradients in input_gradients]
+        filtered_input_gradients = [gradient for gradient, input_id in zip(pooled_gradients, input_ids) if input_id is not None]
+        return self._calculate_grouped_importance(input_ids, filtered_input_gradients, groups, group_gradient_pooling, MaxGradient.SINGLE_OUTPUT, ignore_non_grouped_input_tokens=ignore_non_grouped_input_tokens)
 
     def calculate_importance_for_nth_output(
             self,
