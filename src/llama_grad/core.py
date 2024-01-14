@@ -44,7 +44,7 @@ class LlamaGrad:
         self.output_tokens_with_gradients = TokenWithGradients(self.model.device)
         self.gradient_calculator = gradient_calculator
 
-    def generate(self, stop_tokens: List[str] = None, max_output_length: int = None) -> TokenWithGradients:
+    def generate(self, stop_tokens: List[str] = None, max_output_length: int = None, callback: Callable[[TokenWithGradients], None] = None) -> TokenWithGradients:
         """
         Generates output tokens using input calculates gradients for each output token until max_length or  EOS is reached (Maybe other settings?)
         :param stop_tokens: list of tokens to stop generating at. Defaults to self.tokenizer.eos_token
@@ -59,6 +59,8 @@ class LlamaGrad:
         self.next_token()
         while self.output_tokens_with_gradients.token_ids[-1].item() not in stop_token_ids and (target_token_count is None or self.output_tokens_with_gradients.token_ids.shape[0] < target_token_count):
             self.next_token()
+            if callback is not None:
+                callback(self.output_tokens_with_gradients)
         # Copy just the newly generated tokes/gradients
         return_token_with_gradients = TokenWithGradients()
         return_token_with_gradients.token_ids = self.output_tokens_with_gradients.token_ids[-max_output_length:] if max_output_length else self.output_tokens_with_gradients.token_ids.clone()
