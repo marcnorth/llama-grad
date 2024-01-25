@@ -5,7 +5,7 @@ from statistics import mean
 from typing import List, Tuple, Optional, Union, TextIO
 import torch
 from torch import Tensor
-from transformers import PreTrainedTokenizerBase, AutoTokenizer
+from transformers import PreTrainedTokenizerBase, AutoTokenizer, CodeLlamaTokenizerFast
 import statistics
 
 from llama_grad import TokenWithGradients
@@ -122,17 +122,7 @@ class InputImportanceCalculator:
         grouped_input_gradients = []
         continue_searching_from = 0  # Index to continue searching for group from
         for group in groups:
-            # Look for group in input_ids
-            group_token_ids = self.tokenizer.encode(group, add_special_tokens=False)
-            found_index = None
-            for i in range(continue_searching_from, len(input_ids) - len(group_token_ids) + 1):
-                # For consistency, decode then encode the sequence we're checking against (sequence may have been encoded differently when part of a larger sequence)
-                decoded_then_encoded = self.tokenizer.encode(self.tokenizer.decode(input_ids[i:i + len(group_token_ids)]), add_special_tokens=False)
-                if decoded_then_encoded == group_token_ids:
-                    found_index = i
-                    break
-            if found_index is None:
-                raise ValueError(f"Group '{group}' not found in '{self.prompt}'")
+            found_index, group_token_ids = self._find_text_in_token_ids(group, input_ids, continue_searching_from)
             # Add all individual tokens before group, then add group
             if found_index > continue_searching_from:
                 grouped_input_ids.extend(input_ids[continue_searching_from:found_index])
@@ -155,6 +145,76 @@ class InputImportanceCalculator:
             list(map(lambda g: g / max_input_gradient, grouped_input_gradients)) if max_input_gradient != 0 else [0] * len(grouped_input_gradients),
             grouped_input_ids
         )
+
+    def _find_text_in_token_ids(self, text: str, token_ids: List[int], not_before: int = 0) -> Tuple[int, List[int]]:
+        """
+        Looks for the given token_ids in self.prompt, beginning at text_start_pos and returns the start index in prompt
+        :param text: Text to look for
+        :return: (Index in token_ids of the start of the text, The actual tokens that were found)
+        """
+        text_start_poses = self._find_all_substrings(self.prompt, text)
+        if len(text_start_poses) == 0:
+            raise ValueError(f"Text '{text}' not found in text '{self.prompt}'")
+        for text_start_pos in text_start_poses:
+            looking_from = text_start_pos
+            looking_to = looking_from + len(text)
+            len_of_token_sequence_to_look_for = len(self.tokenizer.encode(self.prompt[looking_from:looking_to]))
+            while True:
+                prompt_segment_to_look_for = self.prompt[looking_from:looking_to]
+                segment_token_ids = self.tokenizer.encode(prompt_segment_to_look_for, add_special_tokens=False)
+                if segment_token_ids[0] == 29871 and type(self.tokenizer) == CodeLlamaTokenizerFast: # See https://github.com/huggingface/transformers/issues/26273
+                    segment_token_ids = segment_token_ids[1:]
+                if (len(segment_token_ids) > len_of_token_sequence_to_look_for):
+                    if looking_to == looking_from + len(text) or looking_from == 0:
+                        # We reach the end when segment is too long on the first shift back
+                        break
+                    looking_from -= 1
+                    looking_to = looking_from + len(text) + 1
+                    continue
+                token_start_indexes = self._find_sublist(segment_token_ids, token_ids)
+                if len(token_start_indexes) == 0:
+                    if looking_to > len(token_ids):
+                        looking_from -= 1
+                        looking_to = looking_from + len(text) + 1
+                    else:
+                        looking_to += 1
+                    continue
+                # Return first token_start_index that isn't less than not_before
+                for token_start_index in token_start_indexes:
+                    if token_start_index >= not_before:
+                        return (token_start_index, segment_token_ids)
+                break
+        raise Exception(f"Text '{text}' not found in tokens for '{self.prompt}'")
+
+    def _find_all_substrings(self, haystack: str, needle: str) -> list[int]:
+        start = 0
+        found = []
+        while True:
+            start = haystack.find(needle, start)
+            if start == -1:
+                return found
+            found.append(start)
+            start += len(needle)
+
+    def _find_sublist(self, sublist: List[int], list: List[int]) -> List[int]:
+        """
+        Looks for a sublist in a list
+        :param sublist:
+        :param list:
+        :return List of the indexes of the start sublist in the list, [] if no sublist is found
+        """
+        sublist_length = len(sublist)
+        found = []
+        if sublist_length == 0:
+            return []
+        checking_index = 0
+        while checking_index <= len(list) - sublist_length:
+            if list[checking_index:checking_index+sublist_length] == sublist:
+                found.append(checking_index)
+                checking_index += sublist_length
+            else:
+                checking_index += 1
+        return found
 
     def _get_input_ids_for_calculation(self, output_token_index: Optional[int] = None, prompt_only: bool = False, ignore: List[str] = []) -> List[Optional[int]]:
         """
