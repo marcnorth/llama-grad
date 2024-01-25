@@ -44,6 +44,7 @@ class InputImportanceCalculator:
             output_gradient_pooling: OutputGradientPooling = OutputGradientPooling.AVERAGE,
             groups: List[str] = [],
             group_gradient_pooling: Optional[GroupGradientPooling] = GroupGradientPooling.AVERAGE,
+            max_gradient: Union[MaxGradient, float] = MaxGradient.SINGLE_OUTPUT,
             ignore: List[str] = [],
             ignore_non_grouped_input_tokens: bool = False,
             exclude_z_scores_greater_than: float=None
@@ -58,17 +59,19 @@ class InputImportanceCalculator:
         if exclude_z_scores_greater_than is not None:
             input_gradints_with_high_z_scores_removed = []
             for gradients_for_input in input_gradients:
+                # Replace inf values
+                max_val = max(val for val in gradients_for_input if val != float('Inf'))
+                gradients_for_input = [val if val != float('Inf') else 2*max_val for val in gradients_for_input]
                 average = sum(gradients_for_input) / len(gradients_for_input)
                 standard_deviation = statistics.pstdev(gradients_for_input)
-                z_scores = [(gradient-average)/standard_deviation for gradient in gradients_for_input]
-                filtered_on_z_score = [gradient for gradient in gradients_for_input if abs((gradient-average)/standard_deviation) <= exclude_z_scores_greater_than]
+                filtered_on_z_score = [gradient for gradient in gradients_for_input if abs((gradient-average)/(standard_deviation if standard_deviation != 0 else 1)) <= exclude_z_scores_greater_than]
                 input_gradints_with_high_z_scores_removed.append(filtered_on_z_score)
             input_gradients = input_gradints_with_high_z_scores_removed
         pooled_gradients = [mean(gradients)/len(gradients) for gradients in input_gradients] \
             if output_gradient_pooling == OutputGradientPooling.AVERAGE else \
             [max(gradients) for gradients in input_gradients]
         filtered_input_gradients = [gradient for gradient, input_id in zip(pooled_gradients, input_ids) if input_id is not None]
-        return self._calculate_grouped_importance(input_ids, filtered_input_gradients, groups, group_gradient_pooling, MaxGradient.SINGLE_OUTPUT, ignore_non_grouped_input_tokens=ignore_non_grouped_input_tokens)
+        return self._calculate_grouped_importance(input_ids, filtered_input_gradients, groups, group_gradient_pooling, max_gradient, ignore_non_grouped_input_tokens=ignore_non_grouped_input_tokens)
 
     def calculate_importance_for_nth_output(
             self,
